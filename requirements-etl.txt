@@ -1,0 +1,19 @@
+# Full ETL/pipeline requirements for local runs (scraper + validation + pipeline)
+# Install with: pip install -r requirements-etl.txt
+
+requests>=2.31,<3
+beautifulsoup4>=4.12,<5
+lxml>=5.2
+
+psycopg2-binary>=2.9.10
+sqlalchemy>=2.0,<3
+
+pandas>=2.2
+numpy>=2.0
+pandera>=0.20
+python-dotenv>=1.0,<2
+
+streamlit>=1.43,<2
+plotly>=5.24,<6
+
+ipython>=8.17
