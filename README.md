@@ -552,3 +552,19 @@ This demonstrates:
 ---
 
 *This document serves as the foundation for technical design, stakeholder alignment, and project scoping.*
+
+## Key Takeaways for Interviews
+
+This project demonstrates:
+
+- **End-to-End Data Engineering**: From data ingestion to analytics-ready outputs.
+- **Production-Grade Practices**: Modular design, error handling, and validation.
+- **Real-World Relevance**: Solves a practical e-commerce pricing problem.
+- **Scalability**: Designed with extensibility and performance in mind.
+- **Documentation**: Comprehensive guides for setup, usage, and troubleshooting.
+
+### Talking Points:
+- Built a data pipeline consolidating fragmented pricing data into a unified warehouse.
+- Implemented schema validation, business rules, and analytics queries.
+- Optimized for performance with indexes and materialized views.
+- Demonstrated strong coding practices and problem-solving skills.
