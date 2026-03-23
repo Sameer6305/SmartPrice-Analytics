@@ -4,7 +4,7 @@ beautifulsoup4==4.12.2
 lxml==4.9.3
 
 # Database
-psycopg2-binary==2.9.9
+psycopg2==2.9.9
 sqlalchemy==2.0.23
 
 # Data Processing
