@@ -17,5 +17,9 @@ pandera==0.18.0
 # Logging & Utilities
 python-dotenv==1.0.0
 
+# Dashboard / Deployment Demo
+streamlit==1.43.2
+plotly==5.24.1
+
 # Optional: Development
 ipython==8.17.2

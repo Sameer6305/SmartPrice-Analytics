@@ -41,6 +41,7 @@ venv.bak/
 # Environment
 .env
 .env.local
+.streamlit/secrets.toml
 
 # Logs
 logs/

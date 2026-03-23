@@ -551,6 +551,66 @@ This demonstrates:
 
 ---
 
+## Easiest Deployment (For Interview Demo)
+
+The fastest way to get a live URL is **Streamlit Community Cloud**.
+
+### What Gets Deployed
+
+- `app.py`: Live dashboard backed by your PostgreSQL analytics tables
+- Existing ETL pipeline remains unchanged (`pipeline.py`)
+
+### 1. Push latest code to GitHub
+
+```bash
+git add .
+git commit -m "Add interview demo dashboard"
+git push origin main
+```
+
+### 2. Create Streamlit app
+
+1. Go to `https://share.streamlit.io`
+2. Click **New app**
+3. Select repo: `Sameer6305/SmartPrice-Analytics`
+4. Branch: `main`
+5. Main file path: `app.py`
+6. Click **Deploy**
+
+### 3. Add database secrets in Streamlit
+
+In app settings, open **Secrets** and add:
+
+```toml
+DB_HOST = "your-db-host"
+DB_PORT = 5432
+DB_NAME = "smart_price_analytics"
+DB_USER = "postgres"
+DB_PASSWORD = "your-password"
+```
+
+Reference template: `.streamlit/secrets.toml.example`
+
+### 4. Seed data once before interview
+
+Run your pipeline (locally or server) so analytics tables contain records:
+
+```bash
+python pipeline.py --pages 1 --queries smartphone
+```
+
+### 5. Demo flow during interview (2 minutes)
+
+1. Open deployed Streamlit URL
+2. Show KPI cards (products, brands, avg price, max discount)
+3. Show 30-day brand trend chart
+4. Show top discounts and volatility tables
+5. Explain that all visuals are SQL-backed from your warehouse
+
+This gives you a **live project link** with business-facing output, which is easier to present than only CLI screenshots.
+
+---
+
 *This document serves as the foundation for technical design, stakeholder alignment, and project scoping.*
 
 ## Key Takeaways for Interviews
