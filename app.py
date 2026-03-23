@@ -7,6 +7,7 @@ simple business-facing metrics and charts that are easy to demo live.
 
 import os
 from datetime import datetime
+from urllib.parse import urlparse
 
 import pandas as pd
 import plotly.express as px
@@ -24,28 +25,78 @@ st.set_page_config(
 
 @st.cache_resource
 def get_db_manager() -> DatabaseManager:
-    """Build a DB manager using Streamlit secrets first, then environment vars."""
+    """Build a DB manager using secrets/env with DATABASE_URL support."""
+
+    def parse_database_url(db_url: str) -> dict:
+        parsed = urlparse(db_url)
+        if not parsed.hostname or not parsed.path:
+            raise ValueError("Invalid DATABASE_URL format")
+
+        db_name = parsed.path.lstrip("/")
+        return {
+            "host": parsed.hostname,
+            "port": int(parsed.port or 5432),
+            "database": db_name,
+            "user": parsed.username,
+            "password": parsed.password,
+        }
+
     cfg = {}
 
-    if hasattr(st, "secrets") and "DB_HOST" in st.secrets:
-        cfg = {
-            "host": st.secrets.get("DB_HOST"),
-            "port": int(st.secrets.get("DB_PORT", 5432)),
-            "database": st.secrets.get("DB_NAME"),
-            "user": st.secrets.get("DB_USER"),
-            "password": st.secrets.get("DB_PASSWORD"),
-        }
+    if hasattr(st, "secrets"):
+        if "DATABASE_URL" in st.secrets and st.secrets.get("DATABASE_URL"):
+            cfg = parse_database_url(str(st.secrets.get("DATABASE_URL")))
+        elif "DB_HOST" in st.secrets:
+            cfg = {
+                "host": st.secrets.get("DB_HOST"),
+                "port": int(st.secrets.get("DB_PORT", 5432)),
+                "database": st.secrets.get("DB_NAME"),
+                "user": st.secrets.get("DB_USER"),
+                "password": st.secrets.get("DB_PASSWORD"),
+            }
 
     if not cfg:
-        cfg = {
-            "host": os.getenv("DB_HOST", "localhost"),
-            "port": int(os.getenv("DB_PORT", 5432)),
-            "database": os.getenv("DB_NAME", "smart_price_analytics"),
-            "user": os.getenv("DB_USER", "postgres"),
-            "password": os.getenv("DB_PASSWORD", ""),
-        }
+        env_db_url = os.getenv("DATABASE_URL")
+        if env_db_url:
+            cfg = parse_database_url(env_db_url)
+        else:
+            cfg = {
+                "host": os.getenv("DB_HOST", "localhost"),
+                "port": int(os.getenv("DB_PORT", 5432)),
+                "database": os.getenv("DB_NAME", "smart_price_analytics"),
+                "user": os.getenv("DB_USER", "postgres"),
+                "password": os.getenv("DB_PASSWORD", ""),
+            }
 
     return DatabaseManager(**cfg)
+
+
+def render_connection_help(error_text: str) -> None:
+    """Show concise troubleshooting guidance for cloud DB connection issues."""
+    st.error("Could not connect to PostgreSQL for dashboard queries.")
+
+    if "localhost" in error_text.lower() or "connection refused" in error_text.lower():
+        st.warning(
+            "Streamlit Cloud cannot use localhost. Add your remote PostgreSQL credentials in app Secrets."
+        )
+
+    st.markdown("Use one of these Secrets formats in Streamlit Cloud:")
+    st.code(
+        """# Option 1: Single URL
+DATABASE_URL = \"postgresql://user:password@host:5432/smart_price_analytics\"
+
+# Option 2: Individual fields
+DB_HOST = \"your-db-host\"
+DB_PORT = 5432
+DB_NAME = \"smart_price_analytics\"
+DB_USER = \"postgres\"
+DB_PASSWORD = \"your-password\"""",
+        language="toml",
+    )
+
+    st.info(
+        "After saving Secrets: reboot the app and ensure analytics tables are populated by running pipeline.py at least once."
+    )
 
 
 def query_to_df(db: DatabaseManager, query: str) -> pd.DataFrame:
@@ -193,12 +244,7 @@ def main() -> None:
         )
 
     except Exception as exc:
-        st.error("Could not load dashboard data.")
-        st.exception(exc)
-        st.info(
-            "Tip: Ensure DB credentials are set in .env (local) or Streamlit secrets (cloud), "
-            "and run the pipeline at least once."
-        )
+        render_connection_help(str(exc))
 
 
 if __name__ == "__main__":
