@@ -1,0 +1,50 @@
+# SmartPrice Analytics Configuration
+# ============================================================================
+
+# Data Sources to Scrape
+sources:
+  amazon:
+    base_url: "https://www.amazon.in/s"
+    search_term: "smartphone"
+    category_code: "electronics"
+    region: "IN"
+    enabled: true
+    rate_limit: 2  # seconds between requests
+  
+  flipkart:
+    base_url: "https://www.flipkart.com/search"
+    search_term: "mobile phones"
+    category_code: "mobile-phones"
+    region: "IN"
+    enabled: false  # Set to true for production multi-source scraping
+    rate_limit: 2
+
+# Validation Rules
+validation:
+  price:
+    min_value: 5000      # Minimum smartphone price in INR
+    max_value: 300000    # Maximum smartphone price in INR
+  
+  rating:
+    min_value: 0.0
+    max_value: 5.0
+  
+  mrp:
+    must_be_greater_than_price: true
+  
+  product_name:
+    required: true
+    min_length: 3
+    max_length: 500
+
+# Database Configuration (load from .env)
+database:
+  staging_schema: "staging"
+  analytics_schema: "analytics"
+  retention_days: 730  # 2 years of data
+
+# Pipeline Logs
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  directory: "logs"
