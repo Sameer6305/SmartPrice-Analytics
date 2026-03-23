@@ -71,6 +71,38 @@ def get_db_manager() -> DatabaseManager:
     return DatabaseManager(**cfg)
 
 
+def has_remote_db_config() -> bool:
+    """Check whether a non-localhost DB configuration exists in secrets or env."""
+
+    def is_remote_host(host: str) -> bool:
+        if not host:
+            return False
+        normalized = str(host).strip().lower()
+        return normalized not in {"localhost", "127.0.0.1", "::1"}
+
+    if hasattr(st, "secrets"):
+        if "DATABASE_URL" in st.secrets and st.secrets.get("DATABASE_URL"):
+            try:
+                parsed = urlparse(str(st.secrets.get("DATABASE_URL")))
+                return is_remote_host(parsed.hostname or "")
+            except Exception:
+                return False
+
+        if "DB_HOST" in st.secrets:
+            return is_remote_host(str(st.secrets.get("DB_HOST", "")))
+
+    env_db_url = os.getenv("DATABASE_URL")
+    if env_db_url:
+        try:
+            parsed = urlparse(env_db_url)
+            return is_remote_host(parsed.hostname or "")
+        except Exception:
+            return False
+
+    env_host = os.getenv("DB_HOST", "")
+    return is_remote_host(env_host)
+
+
 def render_connection_help(error_text: str) -> None:
     """Show concise troubleshooting guidance for cloud DB connection issues."""
     st.error("Could not connect to PostgreSQL for dashboard queries.")
@@ -253,6 +285,20 @@ def main() -> None:
         "Use this app during interviews to show business metrics, trends, and SQL-backed insights."
     )
 
+    # Zero-setup path for Streamlit Cloud: if no remote DB is configured,
+    # start directly in demo mode instead of showing connection errors.
+    if not has_remote_db_config():
+        st.success("App is running in demo mode. Add remote DB secrets anytime to switch to live data.")
+        demo_kpi, demo_trend, demo_discounts, demo_volatility = build_demo_frames()
+        render_dashboard(
+            kpi=demo_kpi,
+            trend_df=demo_trend,
+            discounts_df=demo_discounts,
+            volatility_df=demo_volatility,
+            mode_label="Data source: Demo dataset (no setup required)",
+        )
+        return
+
     try:
         db = get_db_manager()
 
@@ -349,6 +395,7 @@ def main() -> None:
         )
 
     except Exception as exc:
+        st.warning("Live database is currently unavailable, switching to demo mode.")
         render_connection_help(str(exc))
         st.divider()
         st.info("Showing demo dataset so the dashboard remains interview-ready.")
