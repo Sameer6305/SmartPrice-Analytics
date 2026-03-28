@@ -28,9 +28,8 @@ PRODUCT_SCHEMA = pa.DataFrameSchema(
     columns={
         "product_name": Column(str, checks=[
             Check.str_length(min_value=3, max_value=500),
-            Check.notnull(),
         ]),
-        "brand": Column(str, checks=[Check.str_length(min_value=1)], nullable=True),
+        "brand": Column(str, checks=[Check.str_length(min_value=1)], nullable=True, required=False),
         "current_price": Column(float, checks=[
             Check.greater_than(0),
             Check.less_than(500000),  # Reasonable max for smartphones
@@ -38,21 +37,21 @@ PRODUCT_SCHEMA = pa.DataFrameSchema(
         "mrp": Column(float, checks=[
             Check.greater_than(0),
             Check.less_than(500000),
-        ], nullable=True),
+        ], nullable=True, required=False),
         "discount_percentage": Column(float, checks=[
             Check.greater_than_or_equal_to(0),
             Check.less_than_or_equal_to(100),
-        ], nullable=True),
+        ], nullable=True, required=False),
         "customer_rating": Column(float, checks=[
             Check.greater_than_or_equal_to(0),
             Check.less_than_or_equal_to(5),
-        ], nullable=True),
-        "review_count": Column(int, checks=[Check.greater_than_or_equal_to(0)], nullable=True),
-        "availability_status": Column(str, nullable=True),
-        "source_marketplace": Column(str, checks=[Check.notnull()]),
-        "source_url": Column(str, nullable=True),
-        "source_region": Column(str, nullable=True),
-        "scrape_timestamp_utc": Column(object, nullable=True),
+        ], nullable=True, required=False),
+        "review_count": Column(int, checks=[Check.greater_than_or_equal_to(0)], nullable=True, required=False),
+        "availability_status": Column(str, nullable=True, required=False),
+        "source_marketplace": Column(str),
+        "source_url": Column(str, nullable=True, required=False),
+        "source_region": Column(str, nullable=True, required=False),
+        "scrape_timestamp_utc": Column(object, nullable=True, required=False),
     },
     strict=False,  # Allow extra columns
 )
@@ -216,6 +215,11 @@ class DataValidator:
         Args:
             df: DataFrame to validate
         """
+        if "current_price" not in df.columns:
+            self.warnings.append("Business rule checks skipped: current_price column missing")
+            logger.info(f"Business rule validation: {len(self.warnings)} warnings found")
+            return
+
         # Rule 1: Price within reasonable range
         invalid_price = df[(df["current_price"] < 5000) | (df["current_price"] > 300000)]
         if len(invalid_price) > 0:
@@ -224,31 +228,34 @@ class DataValidator:
             )
         
         # Rule 2: MRP >= Price
-        invalid_mrp = df[(df["mrp"].notna()) & (df["mrp"] < df["current_price"])]
-        if len(invalid_mrp) > 0:
-            self.warnings.append(
-                f"{len(invalid_mrp)} records have MRP < Current Price"
-            )
+        if "mrp" in df.columns:
+            invalid_mrp = df[(df["mrp"].notna()) & (df["mrp"] < df["current_price"])]
+            if len(invalid_mrp) > 0:
+                self.warnings.append(
+                    f"{len(invalid_mrp)} records have MRP < Current Price"
+                )
         
         # Rule 3: Rating consistency
-        invalid_rating = df[
-            (df["customer_rating"].notna()) & 
-            ((df["customer_rating"] < 0) | (df["customer_rating"] > 5))
-        ]
-        if len(invalid_rating) > 0:
-            self.warnings.append(
-                f"{len(invalid_rating)} records have invalid ratings (outside 0-5)"
-            )
+        if "customer_rating" in df.columns:
+            invalid_rating = df[
+                (df["customer_rating"].notna()) & 
+                ((df["customer_rating"] < 0) | (df["customer_rating"] > 5))
+            ]
+            if len(invalid_rating) > 0:
+                self.warnings.append(
+                    f"{len(invalid_rating)} records have invalid ratings (outside 0-5)"
+                )
         
         # Rule 4: Discount consistency
-        invalid_discount = df[
-            (df["discount_percentage"].notna()) & 
-            ((df["discount_percentage"] < 0) | (df["discount_percentage"] > 100))
-        ]
-        if len(invalid_discount) > 0:
-            self.warnings.append(
-                f"{len(invalid_discount)} records have invalid discount percentages"
-            )
+        if "discount_percentage" in df.columns:
+            invalid_discount = df[
+                (df["discount_percentage"].notna()) & 
+                ((df["discount_percentage"] < 0) | (df["discount_percentage"] > 100))
+            ]
+            if len(invalid_discount) > 0:
+                self.warnings.append(
+                    f"{len(invalid_discount)} records have invalid discount percentages"
+                )
         
         logger.info(f"Business rule validation: {len(self.warnings)} warnings found")
     

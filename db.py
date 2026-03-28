@@ -54,6 +54,7 @@ class DatabaseManager:
         self.password = password or os.getenv("DB_PASSWORD", "")
         
         self.connection_pool = None
+        self._sqlalchemy_engine = None
         self._initialize_pool()
     
     def _initialize_pool(self):
@@ -101,6 +102,7 @@ class DatabaseManager:
         conn = self.get_connection()
         if not conn:
             return False
+        cur = None
         
         try:
             cur = conn.cursor()
@@ -113,7 +115,8 @@ class DatabaseManager:
             conn.rollback()
             return False
         finally:
-            cur.close()
+            if cur is not None:
+                cur.close()
             self.return_connection(conn)
     
     def fetch_query(self, query: str, params: tuple = None) -> Optional[List[tuple]]:
@@ -130,6 +133,7 @@ class DatabaseManager:
         conn = self.get_connection()
         if not conn:
             return None
+        cur = None
         
         try:
             cur = conn.cursor()
@@ -140,8 +144,20 @@ class DatabaseManager:
             logger.error(f"Query fetch failed: {e}")
             return None
         finally:
-            cur.close()
+            if cur is not None:
+                cur.close()
             self.return_connection(conn)
+
+    def _get_sqlalchemy_engine(self):
+        """Create and cache SQLAlchemy engine for reuse across loads."""
+        from sqlalchemy import create_engine
+
+        if self._sqlalchemy_engine is None:
+            self._sqlalchemy_engine = create_engine(
+                f"postgresql+psycopg2://{self.user}:{self.password}"
+                f"@{self.host}:{self.port}/{self.database}"
+            )
+        return self._sqlalchemy_engine
     
     def load_dataframe(
         self,
@@ -162,14 +178,8 @@ class DatabaseManager:
         Returns:
             True if successful, False otherwise.
         """
-        from sqlalchemy import create_engine
-        
         try:
-            # Create SQLAlchemy engine
-            engine = create_engine(
-                f"postgresql+psycopg2://{self.user}:{self.password}"
-                f"@{self.host}:{self.port}/{self.database}"
-            )
+            engine = self._get_sqlalchemy_engine()
             
             # Convert timestamp columns
             for col in df.columns:
@@ -203,7 +213,10 @@ class DatabaseManager:
     def close(self):
         """Close all connections in the pool."""
         try:
-            self.connection_pool.closeall()
+            if self.connection_pool:
+                self.connection_pool.closeall()
+            if self._sqlalchemy_engine is not None:
+                self._sqlalchemy_engine.dispose()
             logger.info("Connection pool closed")
         except Error as e:
             logger.error(f"Error closing connection pool: {e}")
@@ -273,7 +286,33 @@ def setup_analytics_schema(db_manager: DatabaseManager) -> bool:
     -- =============================================================================
     
     CREATE SCHEMA IF NOT EXISTS analytics;
+    CREATE SCHEMA IF NOT EXISTS ops;
     COMMENT ON SCHEMA analytics IS 'Analytics layer with transformed, ready-to-query data';
+    COMMENT ON SCHEMA ops IS 'Operational metadata and pipeline audit logs';
+
+    -- =============================================================================
+    -- OPERATIONAL TABLE: Pipeline Run Audit
+    -- =============================================================================
+
+    CREATE TABLE IF NOT EXISTS ops.pipeline_run_audit (
+        run_id                   VARCHAR(64)     PRIMARY KEY,
+        started_at               TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        ended_at                 TIMESTAMP WITH TIME ZONE NULL,
+        status                   VARCHAR(20)     NOT NULL,
+        dry_run                  BOOLEAN         NOT NULL DEFAULT FALSE,
+        search_queries           TEXT            NULL,
+        pages_per_query          INTEGER         NULL,
+        scraped_records          INTEGER         DEFAULT 0,
+        valid_records            INTEGER         DEFAULT 0,
+        deduplicated_records     INTEGER         DEFAULT 0,
+        loaded_records           INTEGER         DEFAULT 0,
+        error_message            TEXT            NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_pipeline_run_audit_started_at
+        ON ops.pipeline_run_audit(started_at DESC);
+
+    COMMENT ON TABLE ops.pipeline_run_audit IS 'Audit trail of pipeline runs with status, metrics, and error context';
     
     -- =============================================================================
     -- DIMENSION TABLE: Products
@@ -316,6 +355,8 @@ def setup_analytics_schema(db_manager: DatabaseManager) -> bool:
     CREATE INDEX IF NOT EXISTS idx_fact_price_date ON analytics.fact_price_history(price_date);
     CREATE INDEX IF NOT EXISTS idx_fact_product_date ON analytics.fact_price_history(product_id, price_date);
     CREATE INDEX IF NOT EXISTS idx_fact_price_marketplace ON analytics.fact_price_history(source_marketplace);
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_fact_product_date_marketplace
+        ON analytics.fact_price_history(product_id, price_date, source_marketplace);
     
     COMMENT ON TABLE analytics.fact_price_history IS 'Time-series fact table for price tracking and analysis';
     

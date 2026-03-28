@@ -136,7 +136,7 @@ def main():
     logger.info("✓ Database setup completed successfully!")
     logger.info("=" * 60)
     logger.info("\nNext steps:")
-    logger.info("1. pip install -r requirements.txt")
+    logger.info("1. pip install -r requirements-etl.txt")
     logger.info("2. python pipeline.py --dry-run")
     logger.info("3. python pipeline.py")
     

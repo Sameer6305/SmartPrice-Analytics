@@ -201,7 +201,7 @@ psql -U postgres -c "CREATE DATABASE smart_price_analytics;"
 #### **Step 3: Install Dependencies**
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-etl.txt
 ```
 
 #### **Step 4: Run the Pipeline (Dry-Run First)**
@@ -272,7 +272,8 @@ ORDER BY stats_date DESC LIMIT 10;
 |------|---------|
 | `.env.example` | Environment variables template |
 | `config.yaml` | Pipeline configuration (sources, validation rules) |
-| `requirements.txt` | Python dependencies |
+| `requirements-etl.txt` | Full ETL dependencies |
+| `requirements.txt` | Streamlit dashboard runtime dependencies |
 
 ---
 
@@ -361,6 +362,38 @@ See `sql/analytics_queries.sql` for 8+ more queries covering:
 - Availability tracking
 - Product lifecycle analysis
 - Stock status monitoring
+
+---
+
+## Operational Audit Queries (Run Monitoring)
+
+The pipeline now records run-level audit data in `ops.pipeline_run_audit` for operational observability.
+
+Run the operational query pack:
+
+```bash
+psql -d smart_price_analytics -f sql/ops_queries.sql
+```
+
+`sql/ops_queries.sql` includes:
+- Recent run status and metrics
+- 30-day success rate
+- Daily latency trend
+- Failure diagnostics
+- 7-day throughput snapshot
+
+---
+
+## CI Pipeline
+
+This repository includes a lightweight GitHub Actions workflow at `.github/workflows/ci.yml`.
+
+On every push/PR to main branches, CI will:
+- Install ETL dependencies
+- Compile-check core Python modules
+- Run unit tests
+
+This provides production-grade guardrails and interview-ready engineering evidence.
 
 ---
 
@@ -462,7 +495,8 @@ psql -U postgres -d smart_price_analytics
 ```
 smart_price_analytics/
 ├── README.md                      # This file
-├── requirements.txt               # Python dependencies
+├── requirements-etl.txt           # ETL/pipeline dependencies
+├── requirements.txt               # Streamlit dashboard dependencies
 ├── config.yaml                    # Pipeline configuration
 ├── .env.example                   # Environment variables template
 │
@@ -474,7 +508,12 @@ smart_price_analytics/
 ├── sql/
 │   ├── staging_schema.sql         # Create staging tables
 │   ├── transformation.sql         # ELT transformation queries
-│   └── analytics_queries.sql      # Business intelligence queries
+│   ├── analytics_queries.sql      # Business intelligence queries
+│   └── ops_queries.sql            # Operational audit queries
+│
+├── .github/
+│   └── workflows/
+│       └── ci.yml                 # Lightweight CI for compile + tests
 │
 ├── logs/                          # Pipeline logs (generated)
 │   └── pipeline.log
@@ -528,7 +567,7 @@ This project demonstrates a **production-grade data engineering solution** for a
 cp .env.example .env
 # Edit .env with your PostgreSQL details
 createdb smart_price_analytics
-pip install -r requirements.txt
+pip install -r requirements-etl.txt
 
 # Dry-run (no database writes)
 python pipeline.py --dry-run --pages 1

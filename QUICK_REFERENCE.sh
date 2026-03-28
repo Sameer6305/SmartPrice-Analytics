@@ -19,7 +19,7 @@ cp .env.example .env
 python setup_db.py
 
 # 4. Install dependencies
-pip install -r requirements.txt
+pip install -r requirements-etl.txt
 
 
 # ============================================================================
@@ -156,6 +156,41 @@ EOF
 # View Python logs
 grep ERROR logs/pipeline.log
 grep WARNING logs/pipeline.log
+
+
+# ============================================================================
+# DEMO DAY OPS CHECKS (One-Command)
+# ============================================================================
+
+# 1) Last 10 pipeline runs
+psql -d smart_price_analytics -c "
+  SELECT run_id, started_at, ended_at, status, dry_run, loaded_records
+  FROM ops.pipeline_run_audit
+  ORDER BY started_at DESC
+  LIMIT 10;
+"
+
+# 2) Success rate over last 30 days
+psql -d smart_price_analytics -c "
+  SELECT
+    COUNT(*) AS total_runs,
+    COUNT(*) FILTER (WHERE status='succeeded') AS succeeded_runs,
+    ROUND(100.0 * COUNT(*) FILTER (WHERE status='succeeded') / NULLIF(COUNT(*), 0), 2) AS success_rate_pct
+  FROM ops.pipeline_run_audit
+  WHERE started_at >= NOW() - INTERVAL '30 days';
+"
+
+# 3) Latest failure reason (if any)
+psql -d smart_price_analytics -c "
+  SELECT started_at, error_message
+  FROM ops.pipeline_run_audit
+  WHERE status = 'failed'
+  ORDER BY started_at DESC
+  LIMIT 1;
+"
+
+# 4) One-shot full ops dashboard query pack
+psql -d smart_price_analytics -f sql/ops_queries.sql
 
 # Clear logs (careful!)
 rm logs/*.log logs/*.txt

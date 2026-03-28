@@ -11,7 +11,9 @@ sqlalchemy>=2.0,<3
 pandas>=2.2
 numpy>=2.0
 pandera>=0.20
+multimethod<2
 python-dotenv>=1.0,<2
+PyYAML>=6.0,<7
 
 streamlit>=1.43,<2
 plotly>=5.24,<6
